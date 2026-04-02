@@ -243,10 +243,10 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
       <div class="field">
         <label>Image Model</label>
         <select id="hfModelSelect">
-          <option value="black-forest-labs/FLUX.1-schnell" selected>FLUX.1 Schnell — fastest</option>
-          <option value="black-forest-labs/FLUX.1-dev">FLUX.1 Dev — best quality</option>
-          <option value="stabilityai/stable-diffusion-xl-base-1.0">Stable Diffusion XL</option>
-          <option value="Lykon/dreamshaper-xl-lightning">DreamShaper XL — artistic</option>
+          <option value="stabilityai/stable-diffusion-3.5-large-turbo" selected>SD 3.5 Large Turbo — fast &amp; great quality ⚡</option>
+          <option value="stabilityai/stable-diffusion-3.5-large">SD 3.5 Large — best quality ✦</option>
+          <option value="stabilityai/stable-diffusion-3.5-medium">SD 3.5 Medium — balanced</option>
+          <option value="stabilityai/stable-diffusion-xl-base-1.0">SDXL — reliable classic</option>
         </select>
       </div>
     </div>
@@ -340,7 +340,7 @@ const PRESETS=[
 let apiKey=S.get('c_ak')||'';
 let model=S.get('c_mdl')||'llama-3.3-70b-versatile';
 let hfKey=S.get('c_hfk')||'';
-let hfModel=S.get('c_hfm')||'black-forest-labs/FLUX.1-schnell';
+let hfModel=S.get('c_hfm')||'stabilityai/stable-diffusion-3.5-large-turbo';
 let chars=S.get('c_chars')||[];
 let activeId=null,busy=false,newImgData=null,editImgData=null,selPreset=PRESETS[0].id;
 
@@ -513,13 +513,12 @@ async function generateImage(){
   loadBub.innerHTML=`<div class="img-gen-loading"><div class="img-spin"></div><span>Generating image…</span></div>`;
   loadRow.appendChild(loadBub); loadMsg.appendChild(loadRow); chatEl.insertBefore(loadMsg,typingEl); scrollBot();
   try{
-    // Use HuggingFace router endpoint (CORS-friendly)
-    const encodedModel=encodeURIComponent(hfModel);
-    const hfUrl=`https://router.huggingface.co/hf-inference/models/${hfModel}/v1/images/generate`;
+    // All models via HF inference provider — simple and consistent
+    const hfUrl=`https://router.huggingface.co/hf-inference/models/${hfModel}/v1/text-to-image`;
     const res=await fetch(hfUrl,{
       method:'POST',
       headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
-      body:JSON.stringify({prompt:prompt,num_inference_steps:hfModel.includes('schnell')?4:25,width:512,height:512})
+      body:JSON.stringify({prompt,width:512,height:512,num_inference_steps:hfModel.includes('turbo')||hfModel.includes('schnell')?4:25,guidance_scale:7.5})
     });
     if(!res.ok){
       const errText=await res.text().catch(()=>'Unknown error');
@@ -529,18 +528,19 @@ async function generateImage(){
     let imgUrl;
     if(contentType.includes('application/json')){
       const json=await res.json();
-      // router returns {images:[{url:...}]} or {data:[{b64_json:...}]}
+      // fal-ai: {images:[{url:...}]}
       if(json.images&&json.images[0]&&json.images[0].url){
         imgUrl=json.images[0].url;
+      // openai-style: {data:[{b64_json or url}]}
       } else if(json.data&&json.data[0]&&json.data[0].b64_json){
         imgUrl='data:image/png;base64,'+json.data[0].b64_json;
       } else if(json.data&&json.data[0]&&json.data[0].url){
         imgUrl=json.data[0].url;
       } else {
-        throw new Error('Unexpected response format: '+JSON.stringify(json).slice(0,120));
+        throw new Error('Unexpected response: '+JSON.stringify(json).slice(0,160));
       }
     } else {
-      // raw image blob fallback
+      // raw image blob (hf-inference SD models return binary)
       const blob=await res.blob();
       imgUrl=URL.createObjectURL(blob);
     }

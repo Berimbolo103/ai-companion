@@ -238,14 +238,12 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
       <div class="field">
         <label>HuggingFace API Key</label>
         <input type="password" id="hfKeyInput" placeholder="hf_…" autocomplete="off">
-        <div class="field-hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> — create a token with Inference permission. Tap 🎨 in chat to generate images.</div>
+        <div class="field-hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> — tick "Make calls to Inference Providers". Add appearance details to your companion's personality (e.g. "long black hair, brown eyes") for accurate character portraits.</div>
       </div>
       <div class="field">
         <label>Image Model</label>
         <select id="hfModelSelect">
-          <option value="flux-schnell" selected>FLUX.1 Schnell — fastest ⚡</option>
-          <option value="flux-dev">FLUX.1 Dev — best quality ✦</option>
-          <option value="sdxl">Stable Diffusion XL — reliable fallback</option>
+          <option value="sdxl" selected>Stable Diffusion XL — free &amp; reliable</option>
         </select>
       </div>
     </div>
@@ -262,7 +260,7 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
           </div>
         </div>
         <div class="field"><label>Personality</label><textarea id="editPersonality" rows="4"></textarea></div>
-        <div style="margin-top:14px;display:flex;gap:8px;"><button class="btn-ghost" id="clearHistoryBtn" style="flex:1;font-size:12px;">🗑 Clear Chat</button><button class="btn-danger" id="deleteCharBtn" style="flex:1;font-size:12px;">Delete Companion</button></div>
+        <div style="margin-top:14px;"><button class="btn-danger" id="deleteCharBtn" style="width:100%;">🗑 Delete This Companion</button></div>
       </div>
     </div>
     <div class="tab-panel" id="tab-memory">
@@ -339,7 +337,7 @@ const PRESETS=[
 let apiKey=S.get('c_ak')||'';
 let model=S.get('c_mdl')||'llama-3.3-70b-versatile';
 let hfKey=S.get('c_hfk')||'';
-let hfModel=S.get('c_hfm')||'flux-schnell';
+let hfModel=S.get('c_hfm')||'sdxl';
 let chars=S.get('c_chars')||[];
 let activeId=null,busy=false,newImgData=null,editImgData=null,selPreset=PRESETS[0].id;
 
@@ -491,48 +489,59 @@ async function extractMem(c){
 
 
 async function generateImage(){
-  const prompt=ui.value.trim();
-  if(!prompt||!hfKey||!activeId||busy) return;
+  const userPrompt=ui.value.trim();
+  if(!userPrompt||!hfKey||!activeId||busy) return;
   const c=getActive(); if(!c) return;
   busy=true;
   const es=$('emptyState'); if(es) es.remove();
   noChat.style.display='none';
-  // show user prompt as message
-  addMsgEl('user',prompt,c,true);
+  addMsgEl('user',userPrompt,c,true);
   c.history=c.history||[];
   ui.value=''; ui.style.height='auto';
   sb.disabled=true; igb.disabled=true;
   saveChars();
-  // show loading bubble
+
+  // Build character-aware prompt using companion personality
+  function buildImgPrompt(companion, raw){
+    const p=companion.personality||'';
+    const hints=[];
+    // Pull appearance clues from personality description
+    const hairM=p.match(/[a-z]+[\s-]?hair/i); if(hairM) hints.push(hairM[0]);
+    const eyeM=p.match(/[a-zA-Z]+ eyes?/i); if(eyeM) hints.push(eyeM[0]);
+    const adjectives=["cute","beautiful","elegant","cool","tall","slim","petite","muscular","handsome","pretty","gorgeous","charming"];
+    const adjM=adjectives.find(a=>p.toLowerCase().includes(a)); if(adjM) hints.push(adjM);
+    const keywords=["you","yourself","ur","your face","selfie","send me","show me","a photo of you","picture of you","photo of u"];
+        const aboutChar=keywords.some(k=>raw.toLowerCase().includes(k));
+    if(aboutChar && hints.length>0){
+      return raw+', '+companion.name+', '+hints.join(', ')+', portrait photo, detailed face, sharp focus, high quality, photorealistic';
+    } else if(aboutChar){
+      return raw+', '+companion.name+', portrait photo, attractive, detailed face, high quality, photorealistic';
+    }
+    return raw+', high quality, detailed, photorealistic';
+  }
+
+  const finalPrompt=buildImgPrompt(c,userPrompt);
+
+  // Loading bubble
   const loadMsg=document.createElement('div'); loadMsg.className='msg ai';
   const loadRow=document.createElement('div'); loadRow.className='msg-row';
   if(c.img){const av=document.createElement('img');av.className='mini-av';av.src=c.img;loadRow.appendChild(av);}
   else{const av=document.createElement('div');av.className='mini-ph';av.textContent=c.name.charAt(0);loadRow.appendChild(av);}
   const loadBub=document.createElement('div'); loadBub.className='img-gen-bubble';
-  loadBub.innerHTML=`<div class="img-gen-loading"><div class="img-spin"></div><span>Generating image…</span></div>`;
-  loadRow.appendChild(loadBub); loadMsg.appendChild(loadRow); chatEl.insertBefore(loadMsg,typingEl); scrollBot();
+  loadBub.innerHTML='<div class="img-gen-loading"><div class="img-spin"></div><span>Generating image...</span></div>';
+  loadRow.appendChild(loadBub); loadMsg.appendChild(loadRow);
+  chatEl.insertBefore(loadMsg,typingEl); scrollBot();
+
   try{
-    // Route to correct provider per model
-    let hfUrl, body;
-    if(hfModel==='flux-schnell'){
-      hfUrl='https://router.huggingface.co/fal-ai/flux/schnell';
-      body={prompt,image_size:{width:512,height:512},num_inference_steps:4,sync_mode:true};
-    } else if(hfModel==='flux-dev'){
-      hfUrl='https://router.huggingface.co/fal-ai/flux/dev';
-      body={prompt,image_size:{width:512,height:512},num_inference_steps:28,guidance_scale:3.5,sync_mode:true};
-    } else {
-      // SDXL via hf-inference — returns raw binary
-      hfUrl='https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0';
-      body={inputs:prompt};
-    }
+    const hfUrl='https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0';
     const res=await fetch(hfUrl,{
       method:'POST',
       headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
-      body:JSON.stringify(body)
+      body:JSON.stringify({inputs:finalPrompt})
     });
     if(!res.ok){
       const errText=await res.text().catch(()=>'Unknown error');
-      throw new Error(`HF ${res.status}: ${errText.slice(0,200)}`);
+      throw new Error('HF '+res.status+': '+errText.slice(0,200));
     }
     const ct=res.headers.get('content-type')||'';
     let imgUrl;
@@ -540,25 +549,14 @@ async function generateImage(){
       imgUrl=URL.createObjectURL(await res.blob());
     } else {
       const json=await res.json();
-      if(json.images&&json.images[0]&&json.images[0].url){
-        imgUrl=json.images[0].url;
-      } else if(json.data&&json.data[0]&&json.data[0].b64_json){
-        imgUrl='data:image/png;base64,'+json.data[0].b64_json;
-      } else if(json.data&&json.data[0]&&json.data[0].url){
-        imgUrl=json.data[0].url;
-      } else {
-        throw new Error('Unexpected response: '+JSON.stringify(json).slice(0,160));
-      }
+      if(json.images&&json.images[0]&&json.images[0].url) imgUrl=json.images[0].url;
+      else throw new Error('Unexpected response: '+JSON.stringify(json).slice(0,160));
     }
-    loadBub.innerHTML=`<img src="${imgUrl}" alt="${prompt.replace(/"/g,'&quot;')}"><div class="img-gen-caption">🎨 ${prompt.length>60?prompt.slice(0,60)+'…':prompt}</div>`;
+    const cap=userPrompt.length>55?userPrompt.slice(0,55)+'...':userPrompt;
+    loadBub.innerHTML='<img src="'+imgUrl+'" alt="generated image"><div class="img-gen-caption">'+cap+'</div>';
   }catch(e){
     loadMsg.remove();
-    addMsgEl('ai',`⚠️ Image gen failed: ${e.message}
-
-Tips:
-• HF token needs "Make calls to Inference Providers" ticked
-• Wait 30s if model is cold and retry
-• Try SDXL in Settings if FLUX keeps failing`,c,true);
+    addMsgEl('ai','Image gen failed: '+e.message+'\n\nTips:\n- HF token needs Make calls to Inference Providers\n- Wait 30s and retry if model is loading',c,true);
   }
   busy=false; sb.disabled=!ui.value.trim()||!apiKey; igb.disabled=!hfKey||!activeId;
 }
@@ -664,11 +662,6 @@ $('saveSettingsBtn').addEventListener('click',()=>{
   closeSettings(); nkb.classList.toggle('active',!apiKey);
 igb.disabled=!hfKey||!activeId;
   sb.disabled=!apiKey||!activeId;
-});
-$('clearHistoryBtn').addEventListener('click',()=>{
-  const c=getActive(); if(!c) return;
-  if(!confirm(`Clear all chat history with ${c.name}? Memories are kept.`)) return;
-  c.history=[]; saveChars(); closeSettings(); renderChat();
 });
 $('deleteCharBtn').addEventListener('click',()=>{
   const c=getActive(); if(!c) return;

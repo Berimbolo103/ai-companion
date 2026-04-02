@@ -206,6 +206,7 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
     <div class="tabs">
       <button class="tab active" data-tab="api">API</button>
       <button class="tab" data-tab="character">Character</button>
+      <button class="tab" data-tab="appearance">Appearance</button>
       <button class="tab" data-tab="memory">Memory</button>
     </div>
     <div class="tab-panel active" id="tab-api">
@@ -238,7 +239,7 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
       <div class="field">
         <label>HuggingFace API Key</label>
         <input type="password" id="hfKeyInput" placeholder="hf_…" autocomplete="off">
-        <div class="field-hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> — tick "Make calls to Inference Providers". Add appearance details to your companion's personality (e.g. "long black hair, brown eyes") for accurate character portraits.</div>
+        <div class="field-hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> — create a token with Inference permission. Tap 🎨 in chat to generate images.</div>
       </div>
       <div class="field">
         <label>Image Model</label>
@@ -261,6 +262,117 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
         </div>
         <div class="field"><label>Personality</label><textarea id="editPersonality" rows="4"></textarea></div>
         <div style="margin-top:14px;"><button class="btn-danger" id="deleteCharBtn" style="width:100%;">🗑 Delete This Companion</button></div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-appearance">
+      <div id="noAppNote" style="font-size:13px;color:var(--muted);padding:10px 0;">Select a companion first.</div>
+      <div id="appFields" style="display:none;">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.7;">Define exactly how your companion looks. These details are locked into every image they send.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="field" style="margin:0;">
+            <label>Gender</label>
+            <select id="appGender">
+              <option value="woman">Woman</option>
+              <option value="man">Man</option>
+              <option value="non-binary person">Non-binary</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Age Range</label>
+            <select id="appAge">
+              <option value="early 20s">Early 20s</option>
+              <option value="mid 20s">Mid 20s</option>
+              <option value="late 20s">Late 20s</option>
+              <option value="early 30s">Early 30s</option>
+              <option value="mid 30s">Mid 30s</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Ethnicity</label>
+            <select id="appEthnicity">
+              <option value="">Any</option>
+              <option value="East Asian">East Asian</option>
+              <option value="Southeast Asian">Southeast Asian</option>
+              <option value="South Asian">South Asian</option>
+              <option value="Caucasian">Caucasian</option>
+              <option value="Latina">Latina</option>
+              <option value="Black">Black</option>
+              <option value="Middle Eastern">Middle Eastern</option>
+              <option value="Mixed">Mixed</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Body Type</label>
+            <select id="appBody">
+              <option value="slim">Slim</option>
+              <option value="petite">Petite</option>
+              <option value="athletic">Athletic</option>
+              <option value="curvy">Curvy</option>
+              <option value="plus-size">Plus-size</option>
+              <option value="muscular">Muscular</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Hair Color</label>
+            <select id="appHairColor">
+              <option value="black hair">Black</option>
+              <option value="dark brown hair">Dark Brown</option>
+              <option value="brown hair">Brown</option>
+              <option value="blonde hair">Blonde</option>
+              <option value="platinum blonde hair">Platinum Blonde</option>
+              <option value="red hair">Red</option>
+              <option value="auburn hair">Auburn</option>
+              <option value="pink hair">Pink</option>
+              <option value="blue hair">Blue</option>
+              <option value="silver hair">Silver</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Hair Style</label>
+            <select id="appHairStyle">
+              <option value="long hair">Long</option>
+              <option value="medium length hair">Medium</option>
+              <option value="short hair">Short</option>
+              <option value="wavy hair">Wavy</option>
+              <option value="curly hair">Curly</option>
+              <option value="straight hair">Straight</option>
+              <option value="ponytail">Ponytail</option>
+              <option value="twintails">Twintails</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Eye Color</label>
+            <select id="appEyes">
+              <option value="dark brown eyes">Dark Brown</option>
+              <option value="brown eyes">Brown</option>
+              <option value="hazel eyes">Hazel</option>
+              <option value="green eyes">Green</option>
+              <option value="blue eyes">Blue</option>
+              <option value="grey eyes">Grey</option>
+              <option value="amber eyes">Amber</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Skin Tone</label>
+            <select id="appSkin">
+              <option value="">Natural</option>
+              <option value="fair skin">Fair</option>
+              <option value="light skin">Light</option>
+              <option value="tan skin">Tan</option>
+              <option value="olive skin">Olive</option>
+              <option value="brown skin">Brown</option>
+              <option value="dark skin">Dark</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>Extra Details (optional)</label>
+          <input type="text" id="appExtra" placeholder="e.g. freckles, dimples, tattoos, glasses, beauty mark...">
+        </div>
+        <div style="margin-top:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:4px;">Preview prompt</div>
+          <div id="appPreview" style="font-size:11px;color:var(--muted2);line-height:1.6;"></div>
+        </div>
       </div>
     </div>
     <div class="tab-panel" id="tab-memory">
@@ -501,26 +613,30 @@ async function generateImage(){
   sb.disabled=true; igb.disabled=true;
   saveChars();
 
-  // Build character-aware prompt using companion personality
-  function buildImgPrompt(companion, raw){
-    const p=companion.personality||'';
-    const hints=[];
-    // Pull appearance clues from personality description
-    const hairM=p.match(/[a-z]+[\s-]?hair/i); if(hairM) hints.push(hairM[0]);
-    const eyeM=p.match(/[a-zA-Z]+ eyes?/i); if(eyeM) hints.push(eyeM[0]);
-    const adjectives=["cute","beautiful","elegant","cool","tall","slim","petite","muscular","handsome","pretty","gorgeous","charming"];
-    const adjM=adjectives.find(a=>p.toLowerCase().includes(a)); if(adjM) hints.push(adjM);
-    const keywords=["you","yourself","ur","your face","selfie","send me","show me","a photo of you","picture of you","photo of u"];
-        const aboutChar=keywords.some(k=>raw.toLowerCase().includes(k));
-    if(aboutChar && hints.length>0){
-      return raw+', '+companion.name+', '+hints.join(', ')+', portrait photo, detailed face, sharp focus, high quality, photorealistic';
-    } else if(aboutChar){
-      return raw+', '+companion.name+', portrait photo, attractive, detailed face, high quality, photorealistic';
+  // Build locked appearance prompt from companion's appearance settings
+  function buildCharPrompt(companion, raw){
+    const app=companion.appearance||{};
+    const parts=[];
+    if(app.gender) parts.push(app.gender);
+    if(app.age) parts.push(app.age);
+    if(app.ethnicity) parts.push(app.ethnicity);
+    if(app.body) parts.push(app.body+' body');
+    if(app.hairColor) parts.push(app.hairColor);
+    if(app.hairStyle) parts.push(app.hairStyle);
+    if(app.eyes) parts.push(app.eyes);
+    if(app.skin) parts.push(app.skin);
+    if(app.extra) parts.push(app.extra);
+    const charDesc=parts.length>0?parts.join(', '):'attractive person';
+    const selfKeywords=['you','yourself','ur','your face','selfie','send me','show me','a photo of you','picture of you','photo of u','of yourself','of you'];
+    const aboutChar=selfKeywords.some(k=>raw.toLowerCase().includes(k));
+    if(aboutChar){
+      return raw+', '+companion.name+', '+charDesc+', portrait photo, sharp focus, detailed face, high quality, photorealistic, 8k';
     }
-    return raw+', high quality, detailed, photorealistic';
+    // Scene image — still inject character if they seem to be in it
+    return raw+', featuring '+charDesc+', high quality, photorealistic, detailed';
   }
 
-  const finalPrompt=buildImgPrompt(c,userPrompt);
+  const finalPrompt=buildCharPrompt(c,userPrompt);
 
   // Loading bubble
   const loadMsg=document.createElement('div'); loadMsg.className='msg ai';
@@ -536,7 +652,7 @@ async function generateImage(){
     const hfUrl='https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0';
     const res=await fetch(hfUrl,{
       method:'POST',
-      headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
+      headers:{'Authorization':'Bearer '+hfKey,'Content-Type':'application/json'},
       body:JSON.stringify({inputs:finalPrompt})
     });
     if(!res.ok){
@@ -550,13 +666,14 @@ async function generateImage(){
     } else {
       const json=await res.json();
       if(json.images&&json.images[0]&&json.images[0].url) imgUrl=json.images[0].url;
-      else throw new Error('Unexpected response: '+JSON.stringify(json).slice(0,160));
+      else if(json[0]&&json[0].generated_image) imgUrl='data:image/png;base64,'+json[0].generated_image;
+      else throw new Error('Unexpected response: '+JSON.stringify(json).slice(0,120));
     }
     const cap=userPrompt.length>55?userPrompt.slice(0,55)+'...':userPrompt;
-    loadBub.innerHTML='<img src="'+imgUrl+'" alt="generated image"><div class="img-gen-caption">'+cap+'</div>';
+    loadBub.innerHTML='<img src="'+imgUrl+'" alt="generated"><div class="img-gen-caption">'+cap+'</div>';
   }catch(e){
     loadMsg.remove();
-    addMsgEl('ai','Image gen failed: '+e.message+'\n\nTips:\n- HF token needs Make calls to Inference Providers\n- Wait 30s and retry if model is loading',c,true);
+    addMsgEl('ai','Image gen failed: '+e.message+'\n\nTips:\n- HF token needs "Make calls to Inference Providers"\n- Wait 30s if model is loading and retry',c,true);
   }
   busy=false; sb.disabled=!ui.value.trim()||!apiKey; igb.disabled=!hfKey||!activeId;
 }
@@ -622,10 +739,23 @@ function openSettings(){
     $('editImgPrev').src=c.img||''; $('editImgPrev').style.display=c.img?'block':'none';
     $('editImgHint').style.display=c.img?'none':'block';
     $('noMemNote').style.display='none'; $('memFields').style.display='block';
+    $('noAppNote').style.display='none'; $('appFields').style.display='block';
+    const app=c.appearance||{};
+    $('appGender').value=app.gender||'woman';
+    $('appAge').value=app.age||'mid 20s';
+    $('appEthnicity').value=app.ethnicity||'';
+    $('appBody').value=app.body||'slim';
+    $('appHairColor').value=app.hairColor||'black hair';
+    $('appHairStyle').value=app.hairStyle||'long hair';
+    $('appEyes').value=app.eyes||'dark brown eyes';
+    $('appSkin').value=app.skin||'';
+    $('appExtra').value=app.extra||'';
+    updateAppPreview(c.name);
     renderMemSettings(c);
   } else {
     $('noCharNote').style.display='block'; $('charEditFields').style.display='none';
     $('noMemNote').style.display='block'; $('memFields').style.display='none';
+    $('noAppNote').style.display='block'; $('appFields').style.display='none';
   }
   $('settingsModal').classList.add('active');
 }
@@ -641,6 +771,26 @@ $('editImgFile').addEventListener('change',e=>{
   const r=new FileReader(); r.onload=ev=>{editImgData=ev.target.result;$('editImgPrev').src=editImgData;$('editImgPrev').style.display='block';$('editImgHint').style.display='none';};
   r.readAsDataURL(f);
 });
+function updateAppPreview(name){
+  const parts=[];
+  const g=$('appGender').value; const age=$('appAge').value;
+  const eth=$('appEthnicity').value; const body=$('appBody').value;
+  const hc=$('appHairColor').value; const hs=$('appHairStyle').value;
+  const eyes=$('appEyes').value; const skin=$('appSkin').value;
+  const extra=$('appExtra').value.trim();
+  if(g) parts.push(g); if(age) parts.push(age); if(eth) parts.push(eth);
+  if(body) parts.push(body+' body'); if(hc) parts.push(hc); if(hs) parts.push(hs);
+  if(eyes) parts.push(eyes); if(skin) parts.push(skin); if(extra) parts.push(extra);
+  const prev=$('appPreview');
+  if(prev) prev.textContent=(name||'Character')+', '+parts.join(', ')+', portrait photo, photorealistic';
+}
+['appGender','appAge','appEthnicity','appBody','appHairColor','appHairStyle','appEyes','appSkin'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('change',()=>updateAppPreview(getActive()&&getActive().name));
+});
+const appExtraEl=document.getElementById('appExtra');
+if(appExtraEl) appExtraEl.addEventListener('input',()=>updateAppPreview(getActive()&&getActive().name));
+
 function closeSettings(){$('settingsModal').classList.remove('active');}
 $('settingsBtn').addEventListener('click',openSettings);
 nkb.addEventListener('click',openSettings);
@@ -657,6 +807,17 @@ $('saveSettingsBtn').addEventListener('click',()=>{
     c.name=$('editName').value.trim()||c.name;
     c.personality=$('editPersonality').value.trim()||c.personality;
     if(editImgData) c.img=editImgData;
+    c.appearance={
+      gender:$('appGender').value,
+      age:$('appAge').value,
+      ethnicity:$('appEthnicity').value,
+      body:$('appBody').value,
+      hairColor:$('appHairColor').value,
+      hairStyle:$('appHairStyle').value,
+      eyes:$('appEyes').value,
+      skin:$('appSkin').value,
+      extra:$('appExtra').value.trim()
+    };
     saveChars(); renderCL(); updateHeader();
   }
   closeSettings(); nkb.classList.toggle('active',!apiKey);

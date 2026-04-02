@@ -513,18 +513,38 @@ async function generateImage(){
   loadBub.innerHTML=`<div class="img-gen-loading"><div class="img-spin"></div><span>Generating image…</span></div>`;
   loadRow.appendChild(loadBub); loadMsg.appendChild(loadRow); chatEl.insertBefore(loadMsg,typingEl); scrollBot();
   try{
-    const res=await fetch(`https://api-inference.huggingface.co/models/${hfModel}`,{
+    // Use HuggingFace router endpoint (CORS-friendly)
+    const encodedModel=encodeURIComponent(hfModel);
+    const hfUrl=`https://router.huggingface.co/hf-inference/models/${hfModel}/v1/images/generate`;
+    const res=await fetch(hfUrl,{
       method:'POST',
-      headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json','x-wait-for-model':'true'},
-      body:JSON.stringify({inputs:prompt,parameters:{width:512,height:512,num_inference_steps:4,guidance_scale:3.5}})
+      headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:prompt,num_inference_steps:hfModel.includes('schnell')?4:25,width:512,height:512})
     });
     if(!res.ok){
       const errText=await res.text().catch(()=>'Unknown error');
-      throw new Error(`HuggingFace: ${res.status} — ${errText.slice(0,120)}`);
+      throw new Error(`HuggingFace ${res.status}: ${errText.slice(0,160)}`);
     }
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
-    loadBub.innerHTML=`<img src="${url}" alt="${prompt.replace(/"/g,'&quot;')}"><div class="img-gen-caption">🎨 ${prompt.length>60?prompt.slice(0,60)+'…':prompt}</div>`;
+    const contentType=res.headers.get('content-type')||'';
+    let imgUrl;
+    if(contentType.includes('application/json')){
+      const json=await res.json();
+      // router returns {images:[{url:...}]} or {data:[{b64_json:...}]}
+      if(json.images&&json.images[0]&&json.images[0].url){
+        imgUrl=json.images[0].url;
+      } else if(json.data&&json.data[0]&&json.data[0].b64_json){
+        imgUrl='data:image/png;base64,'+json.data[0].b64_json;
+      } else if(json.data&&json.data[0]&&json.data[0].url){
+        imgUrl=json.data[0].url;
+      } else {
+        throw new Error('Unexpected response format: '+JSON.stringify(json).slice(0,120));
+      }
+    } else {
+      // raw image blob fallback
+      const blob=await res.blob();
+      imgUrl=URL.createObjectURL(blob);
+    }
+    loadBub.innerHTML=`<img src="${imgUrl}" alt="${prompt.replace(/"/g,'&quot;')}"><div class="img-gen-caption">🎨 ${prompt.length>60?prompt.slice(0,60)+'…':prompt}</div>`;
   }catch(e){
     loadMsg.remove();
     addMsgEl('ai',`⚠️ Image gen failed: ${e.message}

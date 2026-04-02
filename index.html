@@ -140,6 +140,17 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
 .mem-x:hover{color:#f87171;}
 .mem-empty{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
 
+/* Image generation */
+.img-btn{width:38px;height:38px;border-radius:10px;background:none;border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;font-size:16px;}
+.img-btn:hover{border-color:var(--accent);background:rgba(244,114,182,0.08);}
+.img-btn:disabled{opacity:0.3;cursor:not-allowed;}
+.img-gen-bubble{background:var(--ai-bubble);border:1px solid var(--border2);border-radius:16px;border-bottom-left-radius:4px;overflow:hidden;max-width:260px;}
+.img-gen-bubble img{width:100%;display:block;border-radius:15px 15px 0 0;}
+.img-gen-caption{font-size:11px;color:var(--muted);padding:7px 11px;font-style:italic;}
+.img-gen-loading{width:220px;height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:12px;}
+.img-spin{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
 @media(max-width:580px){
   .chatlist{width:58px;}
   .cl-item,.cl-add{width:38px;height:38px;}
@@ -198,13 +209,14 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
       <button class="tab" data-tab="memory">Memory</button>
     </div>
     <div class="tab-panel active" id="tab-api">
+      <div class="section-lbl">Chat (Groq)</div>
       <div class="field">
         <label>Groq API Key</label>
         <input type="password" id="apiKeyInput" placeholder="gsk_…" autocomplete="off">
         <div class="field-hint">Free at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a>. Stored only in your browser.</div>
       </div>
       <div class="field">
-        <label>Model</label>
+        <label>Chat Model</label>
         <select id="modelSelect">
           <optgroup label="Llama">
             <option value="llama-3.1-8b-instant">Llama 3.1 8B — fastest</option>
@@ -219,6 +231,22 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
             <option value="gemma2-9b-it">Gemma 2 9B</option>
             <option value="compound-beta">Compound Beta (web search)</option>
           </optgroup>
+        </select>
+      </div>
+      <div class="divider"></div>
+      <div class="section-lbl">Image Generation (HuggingFace)</div>
+      <div class="field">
+        <label>HuggingFace API Key</label>
+        <input type="password" id="hfKeyInput" placeholder="hf_…" autocomplete="off">
+        <div class="field-hint">Free at <a href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</a> — create a token with Inference permission. Tap 🎨 in chat to generate images.</div>
+      </div>
+      <div class="field">
+        <label>Image Model</label>
+        <select id="hfModelSelect">
+          <option value="black-forest-labs/FLUX.1-schnell" selected>FLUX.1 Schnell — fastest</option>
+          <option value="black-forest-labs/FLUX.1-dev">FLUX.1 Dev — best quality</option>
+          <option value="stabilityai/stable-diffusion-xl-base-1.0">Stable Diffusion XL</option>
+          <option value="Lykon/dreamshaper-xl-lightning">DreamShaper XL — artistic</option>
         </select>
       </div>
     </div>
@@ -282,6 +310,7 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
     <div class="no-key-banner" id="noKeyBanner">⚡ No API key — tap to set up your free Groq key</div>
     <div class="input-row">
       <textarea id="userInput" placeholder="Say something…" rows="1"></textarea>
+      <button class="img-btn" id="imgGenBtn" disabled title="Generate an image">🎨</button>
       <button id="sendBtn" disabled>
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
@@ -310,12 +339,14 @@ const PRESETS=[
 
 let apiKey=S.get('c_ak')||'';
 let model=S.get('c_mdl')||'llama-3.3-70b-versatile';
+let hfKey=S.get('c_hfk')||'';
+let hfModel=S.get('c_hfm')||'black-forest-labs/FLUX.1-schnell';
 let chars=S.get('c_chars')||[];
 let activeId=null,busy=false,newImgData=null,editImgData=null,selPreset=PRESETS[0].id;
 
 const $=id=>document.getElementById(id);
 const chatEl=$('chat'),ui=$('userInput'),sb=$('sendBtn'),typingEl=$('typingEl');
-const noChat=$('noChat'),nkb=$('noKeyBanner');
+const noChat=$('noChat'),nkb=$('noKeyBanner'),igb=$('imgGenBtn');
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function saveChars(){S.set('c_chars',chars);}
@@ -367,7 +398,7 @@ function renderCL(){
 
 function selectChar(id){
   activeId=id; renderCL(); renderChat(); updateHeader();
-  sb.disabled=!apiKey; ui.focus();
+  sb.disabled=!apiKey; igb.disabled=!hfKey||!activeId; ui.focus();
 }
 
 function updateHeader(){
@@ -431,7 +462,7 @@ async function send(){
     hideTyping(); addMsgEl('ai',reply,c,true); saveChars();
     if(c.history.length%4===0) extractMem(c);
   }catch(e){hideTyping();addMsgEl('ai',`⚠️ ${e.message}\n\nCheck your API key in ⚙ Settings.`,c,true);}
-  busy=false; sb.disabled=!ui.value.trim()||!apiKey;
+  busy=false; sb.disabled=!ui.value.trim()||!apiKey; igb.disabled=!hfKey||!activeId||busy;
 }
 
 async function extractMem(c){
@@ -459,6 +490,50 @@ async function extractMem(c){
   }catch(e){}
 }
 
+
+async function generateImage(){
+  const prompt=ui.value.trim();
+  if(!prompt||!hfKey||!activeId||busy) return;
+  const c=getActive(); if(!c) return;
+  busy=true;
+  const es=$('emptyState'); if(es) es.remove();
+  noChat.style.display='none';
+  // show user prompt as message
+  addMsgEl('user',prompt,c,true);
+  c.history=c.history||[];
+  ui.value=''; ui.style.height='auto';
+  sb.disabled=true; igb.disabled=true;
+  saveChars();
+  // show loading bubble
+  const loadMsg=document.createElement('div'); loadMsg.className='msg ai';
+  const loadRow=document.createElement('div'); loadRow.className='msg-row';
+  if(c.img){const av=document.createElement('img');av.className='mini-av';av.src=c.img;loadRow.appendChild(av);}
+  else{const av=document.createElement('div');av.className='mini-ph';av.textContent=c.name.charAt(0);loadRow.appendChild(av);}
+  const loadBub=document.createElement('div'); loadBub.className='img-gen-bubble';
+  loadBub.innerHTML=`<div class="img-gen-loading"><div class="img-spin"></div><span>Generating image…</span></div>`;
+  loadRow.appendChild(loadBub); loadMsg.appendChild(loadRow); chatEl.insertBefore(loadMsg,typingEl); scrollBot();
+  try{
+    const res=await fetch(`https://api-inference.huggingface.co/models/${hfModel}`,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json','x-wait-for-model':'true'},
+      body:JSON.stringify({inputs:prompt,parameters:{width:512,height:512,num_inference_steps:4,guidance_scale:3.5}})
+    });
+    if(!res.ok){
+      const errText=await res.text().catch(()=>'Unknown error');
+      throw new Error(`HuggingFace: ${res.status} — ${errText.slice(0,120)}`);
+    }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    loadBub.innerHTML=`<img src="${url}" alt="${prompt.replace(/"/g,'&quot;')}"><div class="img-gen-caption">🎨 ${prompt.length>60?prompt.slice(0,60)+'…':prompt}</div>`;
+  }catch(e){
+    loadMsg.remove();
+    addMsgEl('ai',`⚠️ Image gen failed: ${e.message}
+
+Check your HuggingFace key in ⚙ Settings → API tab.`,c,true);
+  }
+  busy=false; sb.disabled=!ui.value.trim()||!apiKey; igb.disabled=!hfKey||!activeId;
+}
+
 function addMsgEl(role,text,c,scroll){
   const msg=document.createElement('div'); msg.className=`msg ${role}`;
   if(role==='ai'&&c){
@@ -479,7 +554,9 @@ function hideTyping(){typingEl.classList.remove('active');}
 ui.addEventListener('input',()=>{
   ui.style.height='auto'; ui.style.height=Math.min(ui.scrollHeight,100)+'px';
   sb.disabled=!ui.value.trim()||!apiKey||!activeId||busy;
+  igb.disabled=!ui.value.trim()||!hfKey||!activeId||busy;
 });
+igb.addEventListener('click',generateImage);
 ui.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!sb.disabled)send();}});
 sb.addEventListener('click',send);
 
@@ -509,6 +586,7 @@ function openSettings(){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='api'));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id==='tab-api'));
   $('apiKeyInput').value=apiKey; $('modelSelect').value=model;
+  $('hfKeyInput').value=hfKey; $('hfModelSelect').value=hfModel;
   const c=getActive();
   if(c){
     $('noCharNote').style.display='none'; $('charEditFields').style.display='block';
@@ -545,7 +623,8 @@ $('saveSettingsBtn').addEventListener('click',()=>{
   const key=$('apiKeyInput').value.trim();
   if(!key){$('apiKeyInput').style.borderColor='#f87171';setTimeout(()=>$('apiKeyInput').style.borderColor='',2000);return;}
   apiKey=key; model=$('modelSelect').value;
-  S.set('c_ak',apiKey); S.set('c_mdl',model);
+  hfKey=$('hfKeyInput').value.trim(); hfModel=$('hfModelSelect').value;
+  S.set('c_ak',apiKey); S.set('c_mdl',model); S.set('c_hfk',hfKey); S.set('c_hfm',hfModel);
   const c=getActive();
   if(c){
     c.name=$('editName').value.trim()||c.name;
@@ -554,6 +633,7 @@ $('saveSettingsBtn').addEventListener('click',()=>{
     saveChars(); renderCL(); updateHeader();
   }
   closeSettings(); nkb.classList.toggle('active',!apiKey);
+igb.disabled=!hfKey||!activeId;
   sb.disabled=!apiKey||!activeId;
 });
 $('deleteCharBtn').addEventListener('click',()=>{

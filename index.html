@@ -243,10 +243,9 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
       <div class="field">
         <label>Image Model</label>
         <select id="hfModelSelect">
-          <option value="stabilityai/stable-diffusion-3.5-large-turbo" selected>SD 3.5 Large Turbo — fast &amp; great quality ⚡</option>
-          <option value="stabilityai/stable-diffusion-3.5-large">SD 3.5 Large — best quality ✦</option>
-          <option value="stabilityai/stable-diffusion-3.5-medium">SD 3.5 Medium — balanced</option>
-          <option value="stabilityai/stable-diffusion-xl-base-1.0">SDXL — reliable classic</option>
+          <option value="flux-schnell" selected>FLUX.1 Schnell — fastest ⚡</option>
+          <option value="flux-dev">FLUX.1 Dev — best quality ✦</option>
+          <option value="sdxl">Stable Diffusion XL — reliable fallback</option>
         </select>
       </div>
     </div>
@@ -263,7 +262,7 @@ footer{padding:10px 18px 14px;flex-shrink:0;border-top:1px solid var(--border2);
           </div>
         </div>
         <div class="field"><label>Personality</label><textarea id="editPersonality" rows="4"></textarea></div>
-        <div style="margin-top:14px;"><button class="btn-danger" id="deleteCharBtn" style="width:100%;">🗑 Delete This Companion</button></div>
+        <div style="margin-top:14px;display:flex;gap:8px;"><button class="btn-ghost" id="clearHistoryBtn" style="flex:1;font-size:12px;">🗑 Clear Chat</button><button class="btn-danger" id="deleteCharBtn" style="flex:1;font-size:12px;">Delete Companion</button></div>
       </div>
     </div>
     <div class="tab-panel" id="tab-memory">
@@ -340,7 +339,7 @@ const PRESETS=[
 let apiKey=S.get('c_ak')||'';
 let model=S.get('c_mdl')||'llama-3.3-70b-versatile';
 let hfKey=S.get('c_hfk')||'';
-let hfModel=S.get('c_hfm')||'stabilityai/stable-diffusion-3.5-large-turbo';
+let hfModel=S.get('c_hfm')||'flux-schnell';
 let chars=S.get('c_chars')||[];
 let activeId=null,busy=false,newImgData=null,editImgData=null,selPreset=PRESETS[0].id;
 
@@ -513,25 +512,36 @@ async function generateImage(){
   loadBub.innerHTML=`<div class="img-gen-loading"><div class="img-spin"></div><span>Generating image…</span></div>`;
   loadRow.appendChild(loadBub); loadMsg.appendChild(loadRow); chatEl.insertBefore(loadMsg,typingEl); scrollBot();
   try{
-    // All models via HF inference provider — simple and consistent
-    const hfUrl=`https://router.huggingface.co/hf-inference/models/${hfModel}/v1/text-to-image`;
+    // Route to correct provider per model
+    let hfUrl, body;
+    if(hfModel==='flux-schnell'){
+      hfUrl='https://router.huggingface.co/fal-ai/flux/schnell';
+      body={prompt,image_size:{width:512,height:512},num_inference_steps:4,sync_mode:true};
+    } else if(hfModel==='flux-dev'){
+      hfUrl='https://router.huggingface.co/fal-ai/flux/dev';
+      body={prompt,image_size:{width:512,height:512},num_inference_steps:28,guidance_scale:3.5,sync_mode:true};
+    } else {
+      // SDXL via hf-inference — returns raw binary
+      hfUrl='https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0';
+      body={inputs:prompt};
+    }
     const res=await fetch(hfUrl,{
       method:'POST',
       headers:{'Authorization':`Bearer ${hfKey}`,'Content-Type':'application/json'},
-      body:JSON.stringify({prompt,width:512,height:512,num_inference_steps:hfModel.includes('turbo')||hfModel.includes('schnell')?4:25,guidance_scale:7.5})
+      body:JSON.stringify(body)
     });
     if(!res.ok){
       const errText=await res.text().catch(()=>'Unknown error');
-      throw new Error(`HuggingFace ${res.status}: ${errText.slice(0,160)}`);
+      throw new Error(`HF ${res.status}: ${errText.slice(0,200)}`);
     }
-    const contentType=res.headers.get('content-type')||'';
+    const ct=res.headers.get('content-type')||'';
     let imgUrl;
-    if(contentType.includes('application/json')){
+    if(ct.includes('image/')){
+      imgUrl=URL.createObjectURL(await res.blob());
+    } else {
       const json=await res.json();
-      // fal-ai: {images:[{url:...}]}
       if(json.images&&json.images[0]&&json.images[0].url){
         imgUrl=json.images[0].url;
-      // openai-style: {data:[{b64_json or url}]}
       } else if(json.data&&json.data[0]&&json.data[0].b64_json){
         imgUrl='data:image/png;base64,'+json.data[0].b64_json;
       } else if(json.data&&json.data[0]&&json.data[0].url){
@@ -539,17 +549,16 @@ async function generateImage(){
       } else {
         throw new Error('Unexpected response: '+JSON.stringify(json).slice(0,160));
       }
-    } else {
-      // raw image blob (hf-inference SD models return binary)
-      const blob=await res.blob();
-      imgUrl=URL.createObjectURL(blob);
     }
     loadBub.innerHTML=`<img src="${imgUrl}" alt="${prompt.replace(/"/g,'&quot;')}"><div class="img-gen-caption">🎨 ${prompt.length>60?prompt.slice(0,60)+'…':prompt}</div>`;
   }catch(e){
     loadMsg.remove();
     addMsgEl('ai',`⚠️ Image gen failed: ${e.message}
 
-Check your HuggingFace key in ⚙ Settings → API tab.`,c,true);
+Tips:
+• HF token needs "Make calls to Inference Providers" ticked
+• Wait 30s if model is cold and retry
+• Try SDXL in Settings if FLUX keeps failing`,c,true);
   }
   busy=false; sb.disabled=!ui.value.trim()||!apiKey; igb.disabled=!hfKey||!activeId;
 }
@@ -655,6 +664,11 @@ $('saveSettingsBtn').addEventListener('click',()=>{
   closeSettings(); nkb.classList.toggle('active',!apiKey);
 igb.disabled=!hfKey||!activeId;
   sb.disabled=!apiKey||!activeId;
+});
+$('clearHistoryBtn').addEventListener('click',()=>{
+  const c=getActive(); if(!c) return;
+  if(!confirm(`Clear all chat history with ${c.name}? Memories are kept.`)) return;
+  c.history=[]; saveChars(); closeSettings(); renderChat();
 });
 $('deleteCharBtn').addEventListener('click',()=>{
   const c=getActive(); if(!c) return;
